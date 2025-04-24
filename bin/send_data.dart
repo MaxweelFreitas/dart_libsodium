@@ -13,7 +13,6 @@ import 'package:flat_buffers/flat_buffers.dart' as fb;
 import 'package:sodium/sodium.dart';
 
 void main() async {
-  // Carrega a DLL do libsodium
   DynamicLibrary loadLibsodium() {
     return DynamicLibrary.open(r'lib\libsodium.dll');
   }
@@ -24,17 +23,18 @@ void main() async {
   await client.fetchServerPublicKey(server);
 
   const iterations = 10;
-  const totalPessoas = 1000000;
+  const totalPessoas = 100000;
   print(
-    '🏗️${XTermColor.limeGreen} Benchmark Aplicando JSON/FlatBuffers Libsodium',
+    '🏗️${XTermColor.limeGreen} Benchmark Aplicando JSON/FlatBuffers Libsodium\n',
   );
   print('📦${XTermColor.cyanBright} Benchmark de Escrita e envio');
   await benchmarkJsonEscrita(iterations, totalPessoas, client, server);
   await benchmarkFlatBuffersEscrita(iterations, totalPessoas, client, server);
 
   print(
-    '\n🔏${XTermColor.cyanBright} Benchmark de Escrita, Encriptação e Salvamento dos dados',
+    '🔏${XTermColor.cyanBright} Benchmark de Escrita, Encriptação e Salvamento dos dados\n',
   );
+  await Future.delayed(const Duration(milliseconds: 100));
   await benchmarkJsonEscritaCriptografada(iterations, totalPessoas, client);
   await benchmarkFlatBuffersEscritaCriptografada(
     iterations,
@@ -42,7 +42,8 @@ void main() async {
     client,
   );
 
-  print('\n🔐${XTermColor.cyanBright} Benchmark de Leitura com Desencriptação');
+  print('🔐${XTermColor.cyanBright} Benchmark de Leitura com Desencriptação\n');
+  await Future.delayed(const Duration(milliseconds: 100));
   await benchmarkJsonLeituraComDesencriptacao(iterations, client);
   await benchmarkFlatBuffersLeituraComDesencriptacao(iterations, client);
 }
@@ -61,7 +62,7 @@ Future<void> benchmarkJsonEscrita(
 
     final pessoas = List.generate(
       totalPessoas,
-      (final j) => {'nome': 'Pessoa $j', 'idade': 20 + (j % 100)},
+      (final j) => {'nome': 'Pessoa \$j', 'idade': 20 + (j % 100)},
     );
 
     final jsonString = jsonEncode({'pessoas': pessoas});
@@ -72,8 +73,11 @@ Future<void> benchmarkJsonEscrita(
     stopwatch.reset();
   }
 
+  final avgMs = totalTime / iterations;
+  final avgSec = (avgMs / 1000).toStringAsFixed(2);
+
   print(
-    '✅ JSON + Encriptado: Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${totalTime / iterations}ms',
+    '✅ JSON + Encriptado: Média de escrita (\$totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
   );
 }
 
@@ -92,8 +96,10 @@ Future<void> benchmarkFlatBuffersEscrita(
     final builder = fb.Builder(initialSize: 1024 * 1024 * 64);
     final pessoasObjBuilders = List.generate(
       totalPessoas,
-      (final j) =>
-          exemplo.PessoaObjectBuilder(nome: 'Pessoa $j', idade: 20 + (j % 100)),
+      (final j) => exemplo.PessoaObjectBuilder(
+        nome: 'Pessoa \$j',
+        idade: 20 + (j % 100),
+      ),
     );
 
     final pessoasOffset = builder.writeList(
@@ -106,7 +112,6 @@ Future<void> benchmarkFlatBuffersEscrita(
     builder.finish(offset);
 
     final Uint8List bytes = builder.buffer.sublist(0, builder.offset);
-
     await client.sendEncryptedMessage(bytes, server, binary: true);
 
     stopwatch.stop();
@@ -114,8 +119,11 @@ Future<void> benchmarkFlatBuffersEscrita(
     stopwatch.reset();
   }
 
+  final avgMs = totalTime / iterations;
+  final avgSec = (avgMs / 1000).toStringAsFixed(2);
+
   print(
-    '✅ FlatBuffers + Encriptado: Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${totalTime / iterations}ms',
+    '✅ FlatBuffers + Encriptado: Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
   );
 }
 
@@ -130,15 +138,13 @@ Future<void> benchmarkJsonEscritaCriptografada(
   for (int i = 0; i < iterations; i++) {
     stopwatch.start();
 
-    // Gera os dados JSON
     final pessoas = List.generate(
       totalPessoas,
-      (final j) => {'nome': 'Pessoa $j', 'idade': 20 + (j % 100)},
+      (final j) => {'nome': 'Pessoa \$j', 'idade': 20 + (j % 100)},
     );
     final jsonString = jsonEncode({'pessoas': pessoas});
     final plainBytes = Uint8List.fromList(utf8.encode(jsonString));
 
-    // Encripta os dados
     final encryptedData = client.crypto.encryptRawBytes(
       data: plainBytes,
       recipientPublicKey: client.serverPublicKey!,
@@ -150,17 +156,28 @@ Future<void> benchmarkJsonEscritaCriptografada(
       ...encryptedData['cipherText']!,
     ]);
 
-    // Salva apenas da última iteração para evitar sobrescrita contínua
+    if (i == iterations - 1) {
+      final file = File('output_json_encrypted.bin');
+      if (file.existsSync()) file.deleteSync();
 
-    await File('output_json_encrypted.bin').writeAsBytes(encryptedBytes);
+      await file.open(mode: FileMode.write).then((final raf) async {
+        await raf.writeFrom(encryptedBytes);
+        await raf.close();
+      });
+
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     stopwatch.stop();
     totalTime += stopwatch.elapsedMilliseconds;
     stopwatch.reset();
   }
 
+  final avgMs = totalTime / iterations;
+  final avgSec = (avgMs / 1000).toStringAsFixed(2);
+
   print(
-    '✅ JSON + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${totalTime / iterations}ms',
+    '✅ JSON + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
   );
 }
 
@@ -175,12 +192,13 @@ Future<void> benchmarkFlatBuffersEscritaCriptografada(
   for (int i = 0; i < iterations; i++) {
     stopwatch.start();
 
-    // Constrói os dados em FlatBuffers
     final builder = fb.Builder(initialSize: 1024 * 1024 * 64);
     final pessoasObjBuilders = List.generate(
       totalPessoas,
-      (final j) =>
-          exemplo.PessoaObjectBuilder(nome: 'Pessoa $j', idade: 20 + (j % 100)),
+      (final j) => exemplo.PessoaObjectBuilder(
+        nome: 'Pessoa \$j',
+        idade: 20 + (j % 100),
+      ),
     );
 
     final pessoasOffset = builder.writeList(
@@ -194,7 +212,6 @@ Future<void> benchmarkFlatBuffersEscritaCriptografada(
 
     final plainBytes = builder.buffer.sublist(0, builder.offset);
 
-    // Encripta os dados
     final encryptedData = client.crypto.encryptRawBytes(
       data: plainBytes,
       recipientPublicKey: client.serverPublicKey!,
@@ -206,17 +223,28 @@ Future<void> benchmarkFlatBuffersEscritaCriptografada(
       ...encryptedData['cipherText']!,
     ]);
 
-    // Salva apenas na última iteração
+    if (i == iterations - 1) {
+      final file = File('output_flatbuffers_encrypted.bin');
+      if (file.existsSync()) file.deleteSync();
 
-    await File('output_flatbuffers_encrypted.bin').writeAsBytes(encryptedBytes);
+      await file.open(mode: FileMode.write).then((final raf) async {
+        await raf.writeFrom(encryptedBytes);
+        await raf.close();
+      });
+
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     stopwatch.stop();
     totalTime += stopwatch.elapsedMilliseconds;
     stopwatch.reset();
   }
 
+  final avgMs = totalTime / iterations;
+  final avgSec = (avgMs / 1000).toStringAsFixed(2);
+
   print(
-    '✅ FlatBuffers + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${totalTime / iterations}ms',
+    '✅ FlatBuffers + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
   );
 }
 
@@ -232,11 +260,9 @@ Future<void> benchmarkJsonLeituraComDesencriptacao(
 
     final file = File('output_json_encrypted.bin');
     final encryptedBytes = file.readAsBytesSync();
-    final decrypted = client.decrypt(
-      encryptedBytes,
-    ); // <- aqui também é a mágica
+    final decrypted = client.decrypt(encryptedBytes);
 
-    final jsonString = utf8.decode(decrypted); // transforma de volta em string
+    final jsonString = utf8.decode(decrypted);
     final Map<String, dynamic> decoded = jsonDecode(jsonString);
     final List<dynamic> pessoas = decoded['pessoas'];
 
@@ -245,8 +271,11 @@ Future<void> benchmarkJsonLeituraComDesencriptacao(
     stopwatch.reset();
   }
 
+  final avgMs = totalTime / iterations;
+  final avgSec = (avgMs / 1000).toStringAsFixed(2);
+
   print(
-    '✅ JSON + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${totalTime / iterations}ms',
+    '✅ JSON + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
   );
 }
 
@@ -262,7 +291,7 @@ Future<void> benchmarkFlatBuffersLeituraComDesencriptacao(
 
     final file = File('output_flatbuffers_encrypted.bin');
     final encryptedBytes = file.readAsBytesSync();
-    final decrypted = client.decrypt(encryptedBytes); // <- aqui é a mágica
+    final decrypted = client.decrypt(encryptedBytes);
 
     final wrapper = exemplo.PessoasWrapper(decrypted);
     final total = wrapper.pessoas?.length ?? 0;
@@ -272,7 +301,10 @@ Future<void> benchmarkFlatBuffersLeituraComDesencriptacao(
     stopwatch.reset();
   }
 
+  final avgMs = totalTime / iterations;
+  final avgSec = (avgMs / 1000).toStringAsFixed(2);
+
   print(
-    '✅ FlatBuffers + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${totalTime / iterations}ms',
+    '✅ FlatBuffers + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
   );
 }
