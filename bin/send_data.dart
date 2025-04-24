@@ -23,7 +23,7 @@ void main() async {
   await client.fetchServerPublicKey(server);
 
   const iterations = 10;
-  const totalPessoas = 100000;
+  const totalPessoas = 1000000;
   print(
     '🏗️${XTermColor.limeGreen} Benchmark Aplicando JSON/FlatBuffers Libsodium\n',
   );
@@ -42,11 +42,14 @@ void main() async {
     client,
   );
 
-  print('🔐${XTermColor.cyanBright} Benchmark de Leitura com Desencriptação\n');
+  print('🔓${XTermColor.cyanBright} Benchmark de Leitura com Desencriptação\n');
   await Future.delayed(const Duration(milliseconds: 100));
   await benchmarkJsonLeituraComDesencriptacao(iterations, client);
   await benchmarkFlatBuffersLeituraComDesencriptacao(iterations, client);
 }
+
+String formatTime(final double ms) =>
+    '(${ms.toStringAsFixed(2)}ms | ${(ms / 1000).toStringAsFixed(2)}s)';
 
 Future<void> benchmarkJsonEscrita(
   final int iterations,
@@ -62,7 +65,7 @@ Future<void> benchmarkJsonEscrita(
 
     final pessoas = List.generate(
       totalPessoas,
-      (final j) => {'nome': 'Pessoa \$j', 'idade': 20 + (j % 100)},
+      (final j) => {'nome': 'Pessoa $j', 'idade': 20 + (j % 100)},
     );
 
     final jsonString = jsonEncode({'pessoas': pessoas});
@@ -74,10 +77,8 @@ Future<void> benchmarkJsonEscrita(
   }
 
   final avgMs = totalTime / iterations;
-  final avgSec = (avgMs / 1000).toStringAsFixed(2);
-
   print(
-    '✅ JSON + Encriptado: Média de escrita (\$totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
+    '✅ JSON + Encriptado: Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${formatTime(avgMs)}',
   );
 }
 
@@ -96,10 +97,8 @@ Future<void> benchmarkFlatBuffersEscrita(
     final builder = fb.Builder(initialSize: 1024 * 1024 * 64);
     final pessoasObjBuilders = List.generate(
       totalPessoas,
-      (final j) => exemplo.PessoaObjectBuilder(
-        nome: 'Pessoa \$j',
-        idade: 20 + (j % 100),
-      ),
+      (final j) =>
+          exemplo.PessoaObjectBuilder(nome: 'Pessoa $j', idade: 20 + (j % 100)),
     );
 
     final pessoasOffset = builder.writeList(
@@ -120,10 +119,8 @@ Future<void> benchmarkFlatBuffersEscrita(
   }
 
   final avgMs = totalTime / iterations;
-  final avgSec = (avgMs / 1000).toStringAsFixed(2);
-
   print(
-    '✅ FlatBuffers + Encriptado: Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
+    '✅ FlatBuffers + Encriptado: Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${formatTime(avgMs)}',
   );
 }
 
@@ -140,7 +137,7 @@ Future<void> benchmarkJsonEscritaCriptografada(
 
     final pessoas = List.generate(
       totalPessoas,
-      (final j) => {'nome': 'Pessoa \$j', 'idade': 20 + (j % 100)},
+      (final j) => {'nome': 'Pessoa $j', 'idade': 20 + (j % 100)},
     );
     final jsonString = jsonEncode({'pessoas': pessoas});
     final plainBytes = Uint8List.fromList(utf8.encode(jsonString));
@@ -174,10 +171,8 @@ Future<void> benchmarkJsonEscritaCriptografada(
   }
 
   final avgMs = totalTime / iterations;
-  final avgSec = (avgMs / 1000).toStringAsFixed(2);
-
   print(
-    '✅ JSON + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
+    '✅ JSON + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${formatTime(avgMs)}',
   );
 }
 
@@ -195,10 +190,8 @@ Future<void> benchmarkFlatBuffersEscritaCriptografada(
     final builder = fb.Builder(initialSize: 1024 * 1024 * 64);
     final pessoasObjBuilders = List.generate(
       totalPessoas,
-      (final j) => exemplo.PessoaObjectBuilder(
-        nome: 'Pessoa \$j',
-        idade: 20 + (j % 100),
-      ),
+      (final j) =>
+          exemplo.PessoaObjectBuilder(nome: 'Pessoa $j', idade: 20 + (j % 100)),
     );
 
     final pessoasOffset = builder.writeList(
@@ -241,10 +234,8 @@ Future<void> benchmarkFlatBuffersEscritaCriptografada(
   }
 
   final avgMs = totalTime / iterations;
-  final avgSec = (avgMs / 1000).toStringAsFixed(2);
-
   print(
-    '✅ FlatBuffers + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
+    '✅ FlatBuffers + Encriptado (somente gravação local): Média de escrita ($totalPessoas pessoas): ${XTermColor.main}${formatTime(avgMs)}',
   );
 }
 
@@ -272,10 +263,8 @@ Future<void> benchmarkJsonLeituraComDesencriptacao(
   }
 
   final avgMs = totalTime / iterations;
-  final avgSec = (avgMs / 1000).toStringAsFixed(2);
-
   print(
-    '✅ JSON + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
+    '✅ JSON + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${formatTime(avgMs)}',
   );
 }
 
@@ -302,9 +291,7 @@ Future<void> benchmarkFlatBuffersLeituraComDesencriptacao(
   }
 
   final avgMs = totalTime / iterations;
-  final avgSec = (avgMs / 1000).toStringAsFixed(2);
-
   print(
-    '✅ FlatBuffers + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${avgMs.toStringAsFixed(2)}ms (${avgSec}s)',
+    '✅ FlatBuffers + Decriptado: Média de leitura + desencriptação: ${XTermColor.main}${formatTime(avgMs)}',
   );
 }
